@@ -1,3 +1,4 @@
+use super::extract_after_phrase;
 use super::Error;
 use super::OperationCode;
 use super::Result;
@@ -94,12 +95,17 @@ impl Block {
         })
     }
 
-    fn get_decrypted_block_data(&self, bill_keys: &BillKeys) -> Result<String> {
+    pub fn get_decrypted_block_data(&self, bill_keys: &BillKeys) -> Result<String> {
+        let decrypted_bytes = self.get_decrypted_block_bytes(bill_keys)?;
+        let block_data_decrypted = String::from_utf8(decrypted_bytes)?;
+        Ok(block_data_decrypted)
+    }
+
+    pub fn get_decrypted_block_bytes(&self, bill_keys: &BillKeys) -> Result<Vec<u8>> {
         let key: Rsa<Private> = Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes())?;
         let bytes = hex::decode(&self.data)?;
         let decrypted_bytes = decrypt_bytes(&bytes, &key);
-        let block_data_decrypted = String::from_utf8(decrypted_bytes)?;
-        Ok(block_data_decrypted)
+        Ok(decrypted_bytes)
     }
 
     /// Extracts a list of unique node IDs involved in a block operation.
@@ -114,25 +120,25 @@ impl Block {
     ///
     pub fn get_nodes_from_block(
         &self,
-        bill: BitcreditBill,
+        bill: &BitcreditBill,
         bill_keys: &BillKeys,
     ) -> Result<Vec<String>> {
         let mut nodes = HashSet::new();
         match self.operation_code {
             Issue => {
-                let drawer_name = bill.drawer.peer_id;
+                let drawer_name = &bill.drawer.peer_id;
                 if !drawer_name.is_empty() {
-                    nodes.insert(drawer_name);
+                    nodes.insert(drawer_name.to_owned());
                 }
 
-                let payee_name = bill.payee.peer_id;
+                let payee_name = &bill.payee.peer_id;
                 if !payee_name.is_empty() {
-                    nodes.insert(payee_name);
+                    nodes.insert(payee_name.to_owned());
                 }
 
-                let drawee_name = bill.drawee.peer_id;
+                let drawee_name = &bill.drawee.peer_id;
                 if !drawee_name.is_empty() {
-                    nodes.insert(drawee_name);
+                    nodes.insert(drawee_name.to_owned());
                 }
             }
             Endorse => {
@@ -462,51 +468,4 @@ fn signature(hash: &str, private_key_pem: &str) -> Result<String> {
     let signature_readable = hex::encode(signature.as_slice());
 
     Ok(signature_readable)
-}
-
-fn extract_after_phrase(input: &str, phrase: &str) -> Option<String> {
-    if let Some(start) = input.find(phrase) {
-        let start_idx = start + phrase.len();
-        if let Some(remaining) = input.get(start_idx..) {
-            if let Some(end_idx) = remaining.find(' ') {
-                return Some(remaining[..end_idx].to_string());
-            } else {
-                return Some(remaining.to_string());
-            }
-        }
-    }
-    None
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn extract_after_phrase_basic() {
-        assert_eq!(
-            extract_after_phrase(
-                "Endorsed by 123 endorsed to 456 amount: 5000",
-                "Endorsed by "
-            ),
-            Some(String::from("123"))
-        );
-        assert_eq!(
-            extract_after_phrase(
-                "Endorsed by 123 endorsed to 456 amount: 5000",
-                " endorsed to "
-            ),
-            Some(String::from("456"))
-        );
-        assert_eq!(
-            extract_after_phrase("Endorsed by 123 endorsed to 456 amount: 5000", " amount: "),
-            Some(String::from("5000"))
-        );
-        assert_eq!(
-            extract_after_phrase(
-                "Endorsed by 123 endorsed to 456 amount: 5000",
-                " weird stuff "
-            ),
-            None
-        );
-    }
 }

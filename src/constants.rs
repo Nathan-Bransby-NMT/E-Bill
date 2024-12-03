@@ -19,8 +19,6 @@ pub const MAX_FILE_NAME_CHARACTERS: usize = 50;
 pub const VALID_FILE_MIME_TYPES: [&str; 3] = ["image/jpeg", "image/png", "application/pdf"];
 
 // Paths
-pub const BILLS_FOLDER_PATH: &str = "bills";
-pub const BILLS_KEYS_FOLDER_PATH: &str = "bills_keys";
 pub const QUOTES_MAP_FOLDER_PATH: &str = "quotes";
 pub const BOOTSTRAP_FOLDER_PATH: &str = "bootstrap";
 pub const QUOTE_MAP_FILE_PATH: &str = "quotes/quotes";

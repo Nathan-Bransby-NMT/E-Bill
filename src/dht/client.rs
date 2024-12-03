@@ -7,7 +7,6 @@ use super::behaviour::{
     ParsedInboundFileRequest,
 };
 use super::{GossipsubEvent, GossipsubEventId, Result};
-use crate::blockchain::Chain;
 use crate::constants::{
     BILLS_PREFIX, BILL_PREFIX, COMPANIES_PREFIX, COMPANY_PREFIX, IDENTITY_PREFIX,
 };
@@ -717,7 +716,8 @@ impl Client {
                     self.get_key(&bill_id).await?;
 
                     if let Ok(chain) = self.bill_store.read_bill_chain_from_file(&bill_id).await {
-                        let bill = chain.get_first_version_bill();
+                        let bill_keys = self.bill_store.read_bill_keys_from_file(&bill_id).await?;
+                        let bill = chain.get_first_version_bill(&bill_keys)?;
                         for file in bill.files {
                             if let Err(e) = self.get_bill_attachment(&bill_id, &file.name).await {
                                 error!("Could not get bill attachment with file name {} for bill {bill_id}: {e}", file.name);
@@ -768,11 +768,12 @@ impl Client {
     /// encrypting it and saving it once it arrives
     pub async fn get_bill_attachment(&mut self, bill_name: &str, file_name: &str) -> Result<()> {
         // check if there is such a bill and if it contains this file
+        let bill_keys = self.bill_store.read_bill_keys_from_file(bill_name).await?;
         let bill = self
             .bill_store
             .read_bill_chain_from_file(bill_name)
             .await?
-            .get_first_version_bill();
+            .get_first_version_bill(&bill_keys)?;
         let local_hash = match bill.files.iter().find(|file| file.name.eq(file_name)) {
             None => {
                 return Err(super::Error::FileNotFoundInBill(format!("Get Bill Attachment: No file found in bill {bill_name} with file name {file_name}")));
@@ -876,7 +877,10 @@ impl Client {
 
         for bill in bills {
             let bill_keys = self.bill_store.read_bill_keys_from_file(&bill.name).await?;
-            let chain = Chain::read_chain_from_file(&bill.name);
+            let chain = self
+                .bill_store
+                .read_bill_chain_from_file(&bill.name)
+                .await?;
             let nodes = chain.get_all_nodes_from_bill(&bill_keys)?;
             for node in nodes {
                 self.add_bill_to_dht_for_node(&bill.name, &node).await?;
@@ -1186,6 +1190,68 @@ impl Client {
         Ok(())
     }
 
+    async fn handle_bill_file_request(
+        &mut self,
+        bill_name: &str,
+        channel: ResponseChannel<FileResponse>,
+    ) -> Result<()> {
+        let file = self.bill_store.get_bill_as_bytes(bill_name).await?;
+        self.respond_file(file, channel).await?;
+        Ok(())
+    }
+
+    async fn handle_bill_file_request_for_keys(
+        &mut self,
+        key_name: &str,
+        node_id: &str,
+        channel: ResponseChannel<FileResponse>,
+    ) -> Result<()> {
+        let chain = self.bill_store.read_bill_chain_from_file(key_name).await?;
+        let bill_keys = self.bill_store.read_bill_keys_from_file(key_name).await?;
+        if chain
+            .get_all_nodes_from_bill(&bill_keys)?
+            .iter()
+            .any(|n| n == node_id)
+        {
+            let data = self
+                .get_identity_public_data_from_dht(node_id.to_owned())
+                .await?;
+            let public_key = data.rsa_public_key_pem;
+            let file = self.bill_store.get_bill_keys_as_bytes(key_name).await?;
+            let file_encrypted = encrypt_bytes_with_public_key(&file, &public_key);
+            self.respond_file(file_encrypted, channel).await?;
+        }
+        Ok(())
+    }
+
+    async fn handle_bill_file_request_for_attachment(
+        &mut self,
+        bill_name: &str,
+        node_id: &str,
+        file_name: &str,
+        channel: ResponseChannel<FileResponse>,
+    ) -> Result<()> {
+        let chain = self.bill_store.read_bill_chain_from_file(bill_name).await?;
+        let bill_keys = self.bill_store.read_bill_keys_from_file(bill_name).await?;
+        if chain
+            .get_all_nodes_from_bill(&bill_keys)?
+            .iter()
+            .any(|n| n == node_id)
+        {
+            let data = self
+                .get_identity_public_data_from_dht(node_id.to_owned())
+                .await?;
+            let public_key = data.rsa_public_key_pem;
+            let file = self
+                .bill_store
+                .open_attached_file(bill_name, file_name)
+                .await?;
+            let file_encrypted = encrypt_bytes_with_public_key(&file, &public_key);
+            self.respond_file(file_encrypted, channel).await?;
+        }
+        Ok(())
+    }
+
     // -------------------------------------------------------------
     // Request handling code ---------------------------------------
     // -------------------------------------------------------------
@@ -1337,15 +1403,10 @@ impl Client {
                             // We can send the bill to anyone requesting it, since the content is encrypted
                             // and is useless without the keys
                             ParsedInboundFileRequest::Bill(BillFileRequest { bill_name }) => {
-                                match self.bill_store.get_bill_as_bytes(&bill_name).await {
-                                    Err(e) => {
-                                        error!("Could not handle inbound request {request}: {e}")
-                                    }
-                                    Ok(file) => {
-                                        if let Err(e) = self.respond_file(file, channel).await {
-                                            error!("Could not handle inbound request {request} - error responding with file: {e}")
-                                        }
-                                    }
+                                if let Err(e) =
+                                    self.handle_bill_file_request(&bill_name, channel).await
+                                {
+                                    error!("Could not handle inbound request {request}: {e}")
                                 }
                             }
                             // We check if the requester is part of the bill and if so, we get their
@@ -1354,41 +1415,11 @@ impl Client {
                                 node_id,
                                 key_name,
                             }) => {
-                                let chain = Chain::read_chain_from_file(&key_name);
-                                if chain.bill_contains_node(&node_id) {
-                                    match self.get_identity_public_data_from_dht(node_id).await {
-                                        Err(e) => {
-                                            error!("Could not handle inbound request {request} - could not get identity public data for: {e}", )
-                                        }
-                                        Ok(data) => {
-                                            let public_key = data.rsa_public_key_pem;
-                                            match self
-                                                .bill_store
-                                                .get_bill_keys_as_bytes(&key_name)
-                                                .await
-                                            {
-                                                Err(e) => {
-                                                    error!(
-                                                "Could not handle inbound request {request}: {e}"
-                                            )
-                                                }
-                                                Ok(file) => {
-                                                    let file_encrypted =
-                                                        encrypt_bytes_with_public_key(
-                                                            &file,
-                                                            &public_key,
-                                                        );
-
-                                                    if let Err(e) = self
-                                                        .respond_file(file_encrypted, channel)
-                                                        .await
-                                                    {
-                                                        error!("Could not handle inbound request {request} - error responding with file: {e}")
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                                if let Err(e) = self
+                                    .handle_bill_file_request_for_keys(&key_name, &node_id, channel)
+                                    .await
+                                {
+                                    error!("Could not handle inbound request {request}: {e}")
                                 }
                             }
                             // We only send attachments (encrypted with the bill public key) to participants of the bill, encrypted with their public key
@@ -1399,42 +1430,13 @@ impl Client {
                                     file_name,
                                 },
                             ) => {
-                                let chain = Chain::read_chain_from_file(&bill_name);
-                                if chain.bill_contains_node(&node_id) {
-                                    match self.get_identity_public_data_from_dht(node_id).await {
-                                        Err(e) => {
-                                            error!("Could not handle inbound request {request} - could not get identity public data for: {e}");
-                                        }
-                                        Ok(data) => {
-                                            let public_key = data.rsa_public_key_pem;
-
-                                            match self
-                                                .bill_store
-                                                .open_attached_file(&bill_name, &file_name)
-                                                .await
-                                            {
-                                                Err(e) => {
-                                                    error!(
-                                                "Could not handle inbound request {request}: {e}"
-                                            )
-                                                }
-                                                Ok(file) => {
-                                                    let file_encrypted =
-                                                        encrypt_bytes_with_public_key(
-                                                            &file,
-                                                            &public_key,
-                                                        );
-
-                                                    if let Err(e) = self
-                                                        .respond_file(file_encrypted, channel)
-                                                        .await
-                                                    {
-                                                        error!("Could not handle inbound request {request} - error responding with file: {e}")
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                                if let Err(e) = self
+                                    .handle_bill_file_request_for_attachment(
+                                        &bill_name, &node_id, &file_name, channel,
+                                    )
+                                    .await
+                                {
+                                    error!("Could not handle inbound request {request}: {e}")
                                 }
                             }
                         }

@@ -1,3 +1,4 @@
+use crate::service::bill_service::BillKeys as LocalBillKeys;
 use moksha_core::primitives::{
     BillKeys, CurrencyUnit, PaymentMethod, PostMintQuoteBitcreditResponse,
     PostRequestToMintBitcreditResponse,
@@ -10,12 +11,9 @@ use url::Url;
 
 use crate::service::bill_service::BitcreditEbillQuote;
 use crate::{
-    bill::{
-        quotes::{
-            add_bitcredit_quote_and_amount_in_quotes_map, add_bitcredit_token_in_quotes_map,
-            add_in_quotes_map, get_quote_from_map, read_quotes_map,
-        },
-        read_keys_from_bill_file,
+    bill::quotes::{
+        add_bitcredit_quote_and_amount_in_quotes_map, add_bitcredit_token_in_quotes_map,
+        add_in_quotes_map, get_quote_from_map, read_quotes_map,
     },
     web::data::RequestToMintBitcreditBillPayload,
 };
@@ -137,6 +135,7 @@ pub async fn client_accept_bitcredit_quote(bill_id: &String) -> String {
 #[tokio::main]
 pub async fn request_to_mint_bitcredit(
     payload: RequestToMintBitcreditBillPayload,
+    bill_keys: LocalBillKeys,
 ) -> PostRequestToMintBitcreditResponse {
     let dir = PathBuf::from("./data/wallet".to_string());
     let db_path = dir.join("wallet.db").to_str().unwrap().to_string();
@@ -152,7 +151,6 @@ pub async fn request_to_mint_bitcredit(
         .await
         .expect("Could not create wallet");
 
-    let bill_keys = read_keys_from_bill_file(&payload.bill_name.clone());
     let keys: BillKeys = BillKeys {
         private_key_pem: bill_keys.private_key_pem,
         public_key_pem: bill_keys.public_key_pem,

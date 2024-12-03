@@ -322,7 +322,7 @@ impl BillServiceApi for BillService {
         for bill in bills.into_iter() {
             let chain = self.store.read_bill_chain_from_file(&bill.name).await?;
             let bill_keys = self.store.read_bill_keys_from_file(&bill.name).await?;
-            let drawer = chain.get_drawer(&bill_keys);
+            let drawer = chain.get_drawer(&bill_keys)?;
             let chain_to_return = ChainToReturn::new(chain.clone(), &bill_keys)?;
             let endorsed = chain.exist_block_with_operation_code(OperationCode::Endorse);
             let accepted = chain.exist_block_with_operation_code(OperationCode::Accept);
@@ -387,16 +387,16 @@ impl BillServiceApi for BillService {
         let identity = self.identity_store.get_full().await?;
         let chain = self.store.read_bill_chain_from_file(bill_name).await?;
         let bill_keys = self.store.read_bill_keys_from_file(bill_name).await?;
-        let bill = chain.get_last_version_bill(&bill_keys).await;
+        let bill = chain.get_last_version_bill(&bill_keys).await?;
 
-        let drawer = chain.get_drawer(&bill_keys);
+        let drawer = chain.get_drawer(&bill_keys)?;
         let mut link_for_buy = "".to_string();
         let chain_to_return = ChainToReturn::new(chain.clone(), &bill_keys)?;
         let endorsed = chain.exist_block_with_operation_code(OperationCode::Endorse);
         let accepted = chain.exist_block_with_operation_code(OperationCode::Accept);
         let mut address_for_selling: String = String::new();
         let mut amount_for_selling = 0;
-        let waiting_for_payment = chain.waiting_for_payment().await;
+        let waiting_for_payment = chain.waiting_for_payment(&bill_keys).await?;
         let mut payment_deadline_has_passed = false;
         let mut waited_for_payment = waiting_for_payment.0;
         if waited_for_payment {
@@ -515,7 +515,8 @@ impl BillServiceApi for BillService {
     async fn get_bill(&self, bill_name: &str) -> Result<BitcreditBill> {
         let chain = self.store.read_bill_chain_from_file(bill_name).await?;
         let bill_keys = self.store.read_bill_keys_from_file(bill_name).await?;
-        Ok(chain.get_last_version_bill(&bill_keys).await)
+        let bill = chain.get_last_version_bill(&bill_keys).await?;
+        Ok(bill)
     }
 
     async fn get_blockchain_for_bill(&self, bill_name: &str) -> Result<Chain> {
@@ -726,7 +727,7 @@ impl BillServiceApi for BillService {
         let mut blockchain = self.store.read_bill_chain_from_file(bill_name).await?;
 
         let bill_keys = self.store.read_bill_keys_from_file(bill_name).await?;
-        let bill = blockchain.get_last_version_bill(&bill_keys).await;
+        let bill = blockchain.get_last_version_bill(&bill_keys).await?;
 
         let accepted = blockchain.exist_block_with_operation_code(OperationCode::Accept);
 
@@ -756,7 +757,7 @@ impl BillServiceApi for BillService {
         let my_peer_id = self.identity_store.get_peer_id().await?.to_string();
         let mut blockchain = self.store.read_bill_chain_from_file(bill_name).await?;
         let bill_keys = self.store.read_bill_keys_from_file(bill_name).await?;
-        let bill = blockchain.get_last_version_bill(&bill_keys).await;
+        let bill = blockchain.get_last_version_bill(&bill_keys).await?;
 
         if (my_peer_id.eq(&bill.payee.peer_id) && !blockchain.has_been_endorsed_sold_or_minted())
             || (my_peer_id.eq(&bill.endorsee.peer_id))
@@ -782,7 +783,7 @@ impl BillServiceApi for BillService {
         let my_peer_id = self.identity_store.get_peer_id().await?.to_string();
         let mut blockchain = self.store.read_bill_chain_from_file(bill_name).await?;
         let bill_keys = self.store.read_bill_keys_from_file(bill_name).await?;
-        let bill = blockchain.get_last_version_bill(&bill_keys).await;
+        let bill = blockchain.get_last_version_bill(&bill_keys).await?;
 
         if (my_peer_id.eq(&bill.payee.peer_id) && !blockchain.has_been_endorsed_sold_or_minted())
             || (my_peer_id.eq(&bill.endorsee.peer_id))
@@ -813,7 +814,7 @@ impl BillServiceApi for BillService {
         let my_peer_id = self.identity_store.get_peer_id().await?.to_string();
         let mut blockchain = self.store.read_bill_chain_from_file(bill_name).await?;
         let bill_keys = self.store.read_bill_keys_from_file(bill_name).await?;
-        let bill = blockchain.get_last_version_bill(&bill_keys).await;
+        let bill = blockchain.get_last_version_bill(&bill_keys).await?;
 
         if (my_peer_id.eq(&bill.payee.peer_id) && !blockchain.has_been_endorsed_sold_or_minted())
             || (my_peer_id.eq(&bill.endorsee.peer_id))
@@ -849,7 +850,7 @@ impl BillServiceApi for BillService {
         let my_peer_id = self.identity_store.get_peer_id().await?.to_string();
         let mut blockchain = self.store.read_bill_chain_from_file(bill_name).await?;
         let bill_keys = self.store.read_bill_keys_from_file(bill_name).await?;
-        let bill = blockchain.get_last_version_bill(&bill_keys).await;
+        let bill = blockchain.get_last_version_bill(&bill_keys).await?;
 
         if (my_peer_id.eq(&bill.payee.peer_id) && !blockchain.has_been_endorsed_or_sold())
             || (my_peer_id.eq(&bill.endorsee.peer_id))
@@ -884,7 +885,7 @@ impl BillServiceApi for BillService {
         let my_peer_id = self.identity_store.get_peer_id().await?.to_string();
         let mut blockchain = self.store.read_bill_chain_from_file(bill_name).await?;
         let bill_keys = self.store.read_bill_keys_from_file(bill_name).await?;
-        let bill = blockchain.get_last_version_bill(&bill_keys).await;
+        let bill = blockchain.get_last_version_bill(&bill_keys).await?;
 
         if (my_peer_id.eq(&bill.payee.peer_id) && !blockchain.has_been_endorsed_sold_or_minted())
             || (my_peer_id.eq(&bill.endorsee.peer_id))

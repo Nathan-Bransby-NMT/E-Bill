@@ -291,7 +291,7 @@ async fn new(
 
     let (command_sender, command_receiver) = mpsc::channel(0);
     let (event_sender, event_receiver) = mpsc::channel(0);
-    let event_loop = EventLoop::new(swarm, command_receiver, event_sender);
+    let event_loop = EventLoop::new(swarm, command_receiver, event_sender, bill_store.clone());
 
     Ok((
         Client::new(command_sender, bill_store, company_store, identity_store),

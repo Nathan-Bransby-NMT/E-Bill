@@ -72,7 +72,7 @@ impl ChainToReturn {
     ///
     pub fn new(chain: Chain, bill_keys: &BillKeys) -> Result<Self> {
         let mut blocks: Vec<BlockToReturn> = Vec::new();
-        let bill = chain.get_first_version_bill_with_keys(bill_keys);
+        let bill = chain.get_first_version_bill(bill_keys)?;
         for block in chain.blocks {
             blocks.push(BlockToReturn::new(block, bill.clone(), bill_keys)?);
         }
@@ -198,4 +198,51 @@ fn encrypted_hash_data_from_bill(bill: &BitcreditBill, private_key_pem: &str) ->
     let encrypted_bytes = encrypt_bytes(&bytes, &key);
 
     Ok(hex::encode(encrypted_bytes))
+}
+
+fn extract_after_phrase(input: &str, phrase: &str) -> Option<String> {
+    if let Some(start) = input.find(phrase) {
+        let start_idx = start + phrase.len();
+        if let Some(remaining) = input.get(start_idx..) {
+            if let Some(end_idx) = remaining.find(' ') {
+                return Some(remaining[..end_idx].to_string());
+            } else {
+                return Some(remaining.to_string());
+            }
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn extract_after_phrase_basic() {
+        assert_eq!(
+            extract_after_phrase(
+                "Endorsed by 123 endorsed to 456 amount: 5000",
+                "Endorsed by "
+            ),
+            Some(String::from("123"))
+        );
+        assert_eq!(
+            extract_after_phrase(
+                "Endorsed by 123 endorsed to 456 amount: 5000",
+                " endorsed to "
+            ),
+            Some(String::from("456"))
+        );
+        assert_eq!(
+            extract_after_phrase("Endorsed by 123 endorsed to 456 amount: 5000", " amount: "),
+            Some(String::from("5000"))
+        );
+        assert_eq!(
+            extract_after_phrase(
+                "Endorsed by 123 endorsed to 456 amount: 5000",
+                " weird stuff "
+            ),
+            None
+        );
+    }
 }
