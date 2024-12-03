@@ -5,9 +5,7 @@ use crate::blockchain::OperationCode::{
 };
 use crate::service::contact_service::IdentityPublicData;
 use crate::{
-    bill::read_keys_from_bill_file,
-    service::bill_service::BitcreditBill,
-    util::rsa::{decrypt_bytes, private_key_from_pem_u8, public_key_from_pem_u8},
+    bill::read_keys_from_bill_file, service::bill_service::BitcreditBill, util::rsa::decrypt_bytes,
 };
 use chrono::prelude::*;
 use log::info;
@@ -556,8 +554,7 @@ impl Block {
     /// - `false` if the signature is invalid.
     ///
     pub fn verifier(&self) -> bool {
-        let public_key_bytes = self.public_key.as_bytes();
-        let public_key_rsa = public_key_from_pem_u8(public_key_bytes);
+        let public_key_rsa = Rsa::public_key_from_pem(self.public_key.as_bytes()).unwrap();
         let verifier_key = PKey::from_rsa(public_key_rsa).unwrap();
 
         let mut verifier = Verifier::new(MessageDigest::sha256(), verifier_key.as_ref()).unwrap();
@@ -625,8 +622,7 @@ fn mine_block(
 /// A `String` containing the hexadecimal representation of the digital signature.
 ///
 fn signature(hash: String, private_key_pem: String) -> String {
-    let private_key_bytes = private_key_pem.as_bytes();
-    let private_key_rsa = private_key_from_pem_u8(private_key_bytes);
+    let private_key_rsa = Rsa::private_key_from_pem(private_key_pem.as_bytes()).unwrap();
     let signer_key = PKey::from_rsa(private_key_rsa).unwrap();
 
     let mut signer: Signer = Signer::new(MessageDigest::sha256(), signer_key.as_ref()).unwrap();

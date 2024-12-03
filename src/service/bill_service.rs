@@ -10,7 +10,7 @@ use crate::persistence::file_upload::FileUploadStoreApi;
 use crate::persistence::identity::IdentityStoreApi;
 use crate::util::get_current_payee_private_key;
 use crate::web::data::File;
-use crate::USERNETWORK;
+use crate::CONFIG;
 use crate::{dht, external, persistence, util};
 use crate::{dht::Client, persistence::bill::BillStoreApi};
 use async_trait::async_trait;
@@ -574,7 +574,7 @@ impl BillServiceApi for BillService {
         file_upload_id: Option<String>,
         timestamp: i64,
     ) -> Result<BitcreditBill> {
-        let (private_key, public_key) = util::create_bitcoin_keypair(*USERNETWORK);
+        let (private_key, public_key) = util::create_bitcoin_keypair(CONFIG.bitcoin_network());
 
         let bill_name = util::sha256_hash(&public_key.to_bytes());
 
@@ -647,7 +647,7 @@ impl BillServiceApi for BillService {
             files: bill_files,
         };
 
-        start_blockchain_for_new_bill(
+        let chain = start_blockchain_for_new_bill(
             &bill,
             OperationCode::Issue,
             public_data_drawer,
@@ -655,7 +655,11 @@ impl BillServiceApi for BillService {
             drawer.identity.private_key_pem,
             private_key_pem,
             timestamp,
-        );
+        )?;
+        let json_chain = serde_json::to_string_pretty(&chain)?;
+        self.store
+            .write_blockchain_to_file(&bill.name, json_chain)
+            .await?;
 
         // clean up temporary file uploads, if there are any, logging any errors
         if let Some(ref upload_id) = file_upload_id {
@@ -1074,7 +1078,7 @@ mod test {
         let private_key = bitcoin::PrivateKey::new(
             s.generate_keypair(&mut bitcoin::secp256k1::rand::thread_rng())
                 .0,
-            *USERNETWORK,
+            CONFIG.bitcoin_network(),
         );
         let public_key = private_key.public_key(&s);
         bill.payee = IdentityPublicData::new_empty();

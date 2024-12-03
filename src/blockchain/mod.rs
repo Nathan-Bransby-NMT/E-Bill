@@ -24,12 +24,21 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Generic error type
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Errors from io handling, or binary serialization/deserialization
+    #[error("io error {0}")]
+    Io(#[from] std::io::Error),
+
     /// If a whole chain is not valid
     #[error("Blockchain is invalid")]
     BlockchainInvalid,
 
+    /// Errors stemming from json deserialization. Most of the time this is a
     #[error("unable to serialize/deserialize to/from JSON {0}")]
     Json(#[from] serde_json::Error),
+
+    /// Errors stemming from cryptography, such as converting keys
+    #[error("Cryptography error: {0}")]
+    Cryptography(#[from] openssl::error::ErrorStack),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -145,18 +154,6 @@ pub enum GossipsubEventId {
     RemoveSignatoryFromCompany,
 }
 
-#[cfg(test)]
-pub fn start_blockchain_for_new_bill(
-    _bill: &BitcreditBill,
-    _operation_code: OperationCode,
-    _drawer: IdentityPublicData,
-    _public_key: String,
-    _private_key: String,
-    _private_key_pem: String,
-    _timestamp: i64,
-) {
-}
-#[cfg(not(test))]
 pub fn start_blockchain_for_new_bill(
     bill: &BitcreditBill,
     operation_code: OperationCode,
@@ -165,15 +162,13 @@ pub fn start_blockchain_for_new_bill(
     private_key: String,
     private_key_pem: String,
     timestamp: i64,
-) {
-    use crate::bill::get_path_for_bill;
-
-    let data_for_new_block_in_bytes = serde_json::to_vec(&drawer).unwrap();
-    let data_for_new_block = "Signed by ".to_string() + &hex::encode(data_for_new_block_in_bytes);
+) -> Result<Chain> {
+    let data_for_new_block_in_bytes = serde_json::to_vec(&drawer)?;
+    let data_for_new_block = format!("Signed by {}", hex::encode(data_for_new_block_in_bytes));
 
     let genesis_hash: String = hex::encode(data_for_new_block.as_bytes());
 
-    let bill_data: String = encrypted_hash_data_from_bill(bill, private_key_pem);
+    let bill_data: String = encrypted_hash_data_from_bill(bill, private_key_pem)?;
 
     let first_block = Block::new(
         1,
@@ -187,8 +182,7 @@ pub fn start_blockchain_for_new_bill(
     );
 
     let chain = Chain::new(first_block);
-    let output_path = get_path_for_bill(&bill.name);
-    std::fs::write(output_path, serde_json::to_string_pretty(&chain).unwrap()).unwrap();
+    Ok(chain)
 }
 
 fn calculate_hash(
@@ -214,11 +208,10 @@ fn calculate_hash(
     hasher.finish().to_vec()
 }
 
-#[cfg_attr(test, allow(dead_code))]
-fn encrypted_hash_data_from_bill(bill: &BitcreditBill, private_key_pem: String) -> String {
-    let bytes = to_vec(bill).unwrap();
-    let key: Rsa<Private> = Rsa::private_key_from_pem(private_key_pem.as_bytes()).unwrap();
+fn encrypted_hash_data_from_bill(bill: &BitcreditBill, private_key_pem: String) -> Result<String> {
+    let bytes = to_vec(bill)?;
+    let key: Rsa<Private> = Rsa::private_key_from_pem(private_key_pem.as_bytes())?;
     let encrypted_bytes = encrypt_bytes(&bytes, &key);
 
-    hex::encode(encrypted_bytes)
+    Ok(hex::encode(encrypted_bytes))
 }

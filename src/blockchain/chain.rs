@@ -10,7 +10,7 @@ use crate::external;
 use crate::service::bill_service::BillKeys;
 use crate::service::bill_service::BitcreditBill;
 use crate::service::contact_service::IdentityPublicData;
-use crate::USERNETWORK;
+use crate::CONFIG;
 use crate::{
     bill::{bill_from_byte_array, read_keys_from_bill_file},
     util::rsa::decrypt_bytes,
@@ -594,7 +594,7 @@ impl Chain {
             .unwrap();
         let pub_key_bill = bitcoin::PublicKey::new(public_key_bill);
 
-        bitcoin::Address::p2pkh(pub_key_bill, *USERNETWORK).to_string()
+        bitcoin::Address::p2pkh(pub_key_bill, CONFIG.bitcoin_network()).to_string()
     }
 
     /// This function extracts the first block's data, decrypts it using the private key

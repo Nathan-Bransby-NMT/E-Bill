@@ -1,7 +1,6 @@
 #![allow(clippy::needless_range_loop)]
 use anyhow::{anyhow, Result};
-use openssl::pkey::{Private, Public};
-use openssl::rsa;
+use openssl::pkey::Private;
 use openssl::rsa::{Padding, Rsa};
 
 pub fn generation_rsa_key() -> Rsa<Private> {
@@ -19,15 +18,6 @@ pub fn pem_public_key_from_rsa(rsa: &Rsa<Private>) -> Result<String> {
     String::from_utf8(public_key)
         .map_err(|e| anyhow!("Could not create string from private key: {e}"))
 }
-
-pub fn private_key_from_pem_u8(private_key_u8: &[u8]) -> Rsa<Private> {
-    rsa::Rsa::private_key_from_pem(private_key_u8).unwrap()
-}
-
-pub fn public_key_from_pem_u8(public_key_u8: &[u8]) -> Rsa<Public> {
-    rsa::Rsa::public_key_from_pem(public_key_u8).unwrap()
-}
-//--------------------------------------------------------------
 
 //-------------------------Bytes common-------------------------
 pub fn encrypt_bytes_with_public_key(bytes: &[u8], public_key: &str) -> Vec<u8> {
