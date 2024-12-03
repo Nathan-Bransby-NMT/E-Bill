@@ -209,7 +209,7 @@ impl Chain {
             let last_version_block_sell = self.get_last_version_block_with_operation_code(Sell);
             let last_block = self.get_latest_block();
 
-            let paid = Self::check_if_last_sell_block_is_paid(self, bill_keys).await;
+            let paid = Self::check_if_last_sell_block_is_paid(self, bill_keys).await?;
 
             if (last_version_block_endorse.id < last_version_block_sell.id)
                 && (last_version_block_mint.id < last_version_block_sell.id)
@@ -373,42 +373,22 @@ impl Chain {
     ///
     /// `true` if the payment has been made, otherwise `false`. If no "Sell" block exists, it returns `false`.
     ///
-    async fn check_if_last_sell_block_is_paid(&self, bill_keys: &BillKeys) -> bool {
+    async fn check_if_last_sell_block_is_paid(&self, bill_keys: &BillKeys) -> Result<bool> {
         if self.exist_block_with_operation_code(Sell) {
             let last_version_block_sell = self.get_last_version_block_with_operation_code(Sell);
+            let block_data_decrypted =
+                last_version_block_sell.get_decrypted_block_data(bill_keys)?;
 
-            let key: Rsa<Private> =
-                Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
-            let bytes = hex::decode(last_version_block_sell.data.clone()).unwrap();
-            let decrypted_bytes = decrypt_bytes(&bytes, &key);
-            let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
-
-            let part_without_sold_to = block_data_decrypted
-                .split(SOLD_TO)
-                .collect::<Vec<&str>>()
-                .get(1)
-                .unwrap()
-                .to_string();
-
-            let part_with_seller_and_amount = part_without_sold_to
-                .clone()
-                .split(SOLD_BY)
-                .collect::<Vec<&str>>()
-                .get(1)
-                .unwrap()
-                .to_string();
-
-            let amount: u64 = part_with_seller_and_amount
-                .clone()
-                .split(AMOUNT)
-                .collect::<Vec<&str>>()
-                .get(1)
-                .unwrap()
-                .to_string()
+            let amount: u64 = extract_after_phrase(&block_data_decrypted, AMOUNT)
+                .ok_or(Error::InvalidBlockdata(String::from(
+                    "Sell: No amount found",
+                )))?
                 .parse()
-                .unwrap();
+                .map_err(|_| {
+                    Error::InvalidBlockdata(String::from("Sell: Amount was no valid number"))
+                })?;
 
-            let bill = self.get_first_version_bill(bill_keys).unwrap();
+            let bill = self.get_first_version_bill(bill_keys)?;
 
             let address_to_pay = Self::get_address_to_pay_for_block_sell(
                 last_version_block_sell.clone(),
@@ -416,11 +396,11 @@ impl Chain {
                 bill_keys,
             );
 
-            external::bitcoin::check_if_paid(address_to_pay, amount)
+            Ok(external::bitcoin::check_if_paid(address_to_pay, amount)
                 .await
-                .0
+                .0)
         } else {
-            false
+            Ok(false)
         }
     }
 
