@@ -352,41 +352,20 @@ impl Chain {
     /// - `true` if the payment deadline for the last sell block has passed.
     /// - `false` if no sell block exists or the deadline has not passed.
     ///
-    pub async fn check_if_payment_deadline_has_passed(&self) -> bool {
+    pub fn check_if_payment_deadline_has_passed(&self, current_timestamp: i64) -> bool {
         if self.exist_block_with_operation_code(Sell) {
             let last_version_block_sell = self.get_last_version_block_with_operation_code(Sell);
-
             let timestamp = last_version_block_sell.timestamp;
 
-            Self::payment_deadline_has_passed(timestamp, 2).await
+            let period: i64 = (86400 * 2) as i64; // 2 days deadline
+            let difference = current_timestamp - timestamp;
+            difference > period
         } else {
             false
         }
     }
 
-    /// This asynchronous function checks whether the specified payment deadline, represented by a
-    /// timestamp, has passed based on the given number of days. It compares the current timestamp with
-    /// the provided timestamp and returns `true` if the difference exceeds the specified number of days.
-    ///
-    /// # Parameters
-    /// - `timestamp`: The timestamp of the payment deadline to compare against (in seconds).
-    /// - `day`: The number of days defining the deadline period.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the payment deadline has passed, otherwise `false`.
-    ///
-    async fn payment_deadline_has_passed(timestamp: i64, day: i32) -> bool {
-        let period: i64 = (86400 * day) as i64;
-        let current_timestamp = external::time::TimeApi::get_atomic_time()
-            .await
-            .unwrap()
-            .timestamp;
-        let diference = current_timestamp - timestamp;
-        diference > period
-    }
-
-    /// This asynchronous function verifies whether the last block that involves a "Sell" operation
+    /// This function verifies whether the last block that involves a "Sell" operation
     /// has been paid. It decrypts the block's data to extract the amount and the recipient's payment address,
     /// then checks the payment status by querying an external Bitcoin service.
     ///

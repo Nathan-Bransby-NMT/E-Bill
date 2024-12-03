@@ -118,7 +118,11 @@ pub trait BillServiceApi: Send + Sync {
     async fn get_bills(&self) -> Result<Vec<BitcreditBillToReturn>>;
 
     /// Gets the full bill for the given bill name
-    async fn get_full_bill(&self, bill_name: &str) -> Result<BitcreditBillToReturn>;
+    async fn get_full_bill(
+        &self,
+        bill_name: &str,
+        current_timestamp: i64,
+    ) -> Result<BitcreditBillToReturn>;
 
     /// Gets the bill for the given bill name
     async fn get_bill(&self, bill_name: &str) -> Result<BitcreditBill>;
@@ -383,7 +387,11 @@ impl BillServiceApi for BillService {
         Ok(res)
     }
 
-    async fn get_full_bill(&self, bill_name: &str) -> Result<BitcreditBillToReturn> {
+    async fn get_full_bill(
+        &self,
+        bill_name: &str,
+        current_timestamp: i64,
+    ) -> Result<BitcreditBillToReturn> {
         let identity = self.identity_store.get_full().await?;
         let chain = self.store.read_bill_chain_from_file(bill_name).await?;
         let bill_keys = self.store.read_bill_keys_from_file(bill_name).await?;
@@ -400,7 +408,8 @@ impl BillServiceApi for BillService {
         let mut payment_deadline_has_passed = false;
         let mut waited_for_payment = waiting_for_payment.0;
         if waited_for_payment {
-            payment_deadline_has_passed = chain.check_if_payment_deadline_has_passed().await;
+            payment_deadline_has_passed =
+                chain.check_if_payment_deadline_has_passed(current_timestamp);
         }
         if payment_deadline_has_passed {
             waited_for_payment = false;
@@ -1530,7 +1539,7 @@ mod test {
             .returning(move || Ok(identity.clone()));
         let service = get_service_with_identity_store(storage, identity_storage);
 
-        let res = service.get_full_bill("some name").await;
+        let res = service.get_full_bill("some name", 1731593928).await;
         assert!(res.is_ok());
         assert_eq!(res.as_ref().unwrap().name, "some name".to_string());
         assert_eq!(res.as_ref().unwrap().drawee.peer_id, drawee_peer_id);

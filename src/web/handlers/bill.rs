@@ -87,7 +87,11 @@ pub async fn return_bill(
     state: &State<ServiceContext>,
     id: String,
 ) -> Result<Json<BitcreditBillToReturn>> {
-    let full_bill = state.bill_service.get_full_bill(&id).await?;
+    let current_timestamp = external::time::TimeApi::get_atomic_time().await?.timestamp;
+    let full_bill = state
+        .bill_service
+        .get_full_bill(&id, current_timestamp)
+        .await?;
     Ok(Json(full_bill))
 }
 
