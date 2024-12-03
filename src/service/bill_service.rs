@@ -1177,11 +1177,15 @@ mod test {
         storage
             .expect_save_attached_file()
             .returning(move |_, _, _| Ok(()));
+        storage
+            .expect_write_blockchain_to_file()
+            .returning(|_, _| Ok(()));
 
         let service = get_service_with_file_upload_store(storage, file_upload_storage);
 
         let mut identity = Identity::new_empty();
         identity.public_key_pem = TEST_PUB_KEY.to_owned();
+        identity.private_key_pem = TEST_PRIVATE_KEY.to_owned();
         let drawer = IdentityWithAll {
             identity,
             peer_id: PeerId::random(),
