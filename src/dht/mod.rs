@@ -3,6 +3,8 @@ use crate::constants::{
     RELAY_BOOTSTRAP_NODE_ONE_IP, RELAY_BOOTSTRAP_NODE_ONE_PEER_ID, RELAY_BOOTSTRAP_NODE_ONE_TCP,
 };
 use behaviour::{ComposedEvent, Event, MyBehaviour};
+use borsh::{to_vec, BorshDeserialize};
+use borsh_derive::{BorshDeserialize, BorshSerialize};
 use event_loop::EventLoop;
 use futures::channel::mpsc;
 use futures::channel::mpsc::Receiver;
@@ -17,7 +19,7 @@ use libp2p::swarm::{SwarmBuilder, SwarmEvent};
 use libp2p::{identify, noise, relay, tcp, yamux, PeerId, Transport};
 use tokio::{spawn, sync::broadcast};
 
-mod behaviour;
+pub mod behaviour;
 mod client;
 mod event_loop;
 
@@ -37,7 +39,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Generic error type
 #[derive(Debug, Error)]
 pub enum Error {
-    /// all errors originating from file, or network io
+    /// all errors originating from file, or network io, or binary serialization or deserialization
     #[error("io error {0}")]
     Io(#[from] std::io::Error),
 
@@ -292,4 +294,35 @@ async fn new(
         event_receiver,
         event_loop,
     ))
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
+pub struct GossipsubEvent {
+    pub id: GossipsubEventId,
+    pub message: Vec<u8>,
+}
+
+impl GossipsubEvent {
+    pub fn new(id: GossipsubEventId, message: Vec<u8>) -> Self {
+        Self { id, message }
+    }
+
+    pub fn to_byte_array(&self) -> Result<Vec<u8>> {
+        let res = to_vec(self)?;
+        Ok(res)
+    }
+
+    pub fn from_byte_array(bytes: &[u8]) -> Result<Self> {
+        let res = Self::try_from_slice(bytes)?;
+        Ok(res)
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
+pub enum GossipsubEventId {
+    Block,
+    Chain,
+    CommandGetChain,
+    AddSignatoryFromCompany,
+    RemoveSignatoryFromCompany,
 }

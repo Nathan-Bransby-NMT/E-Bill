@@ -1,5 +1,6 @@
 use super::behaviour::{Command, ComposedEvent, Event, MyBehaviour};
-use crate::blockchain::{Chain, GossipsubEvent, GossipsubEventId};
+use super::{GossipsubEvent, GossipsubEventId};
+use crate::blockchain::Chain;
 use crate::constants::{
     BILL_PREFIX, COMPANY_PREFIX, RELAY_BOOTSTRAP_NODE_ONE_IP, RELAY_BOOTSTRAP_NODE_ONE_PEER_ID,
     RELAY_BOOTSTRAP_NODE_ONE_TCP,
@@ -267,7 +268,7 @@ impl EventLoop {
                 );
                 if message.topic.as_str().starts_with(COMPANY_PREFIX) {
                     if let Some(company_id) = message.topic.as_str().strip_prefix(COMPANY_PREFIX) {
-                        let event = GossipsubEvent::from_byte_array(&message.data);
+                        let event = GossipsubEvent::from_byte_array(&message.data).unwrap();
 
                         match event.id {
                             GossipsubEventId::AddSignatoryFromCompany => {
@@ -307,7 +308,7 @@ impl EventLoop {
                     }
                 } else if message.topic.as_str().starts_with(BILL_PREFIX) {
                     if let Some(bill_name) = message.topic.as_str().strip_prefix(BILL_PREFIX) {
-                        let event = GossipsubEvent::from_byte_array(&message.data);
+                        let event = GossipsubEvent::from_byte_array(&message.data).unwrap();
 
                         match event.id {
                             GossipsubEventId::Block => {
@@ -330,7 +331,7 @@ impl EventLoop {
                                 if let Ok(chain_bytes) = serde_json::to_vec(&chain) {
                                     let event =
                                         GossipsubEvent::new(GossipsubEventId::Chain, chain_bytes);
-                                    let message = event.to_byte_array();
+                                    let message = event.to_byte_array().unwrap();
                                     if let Err(e) = self
                                         .swarm
                                         .behaviour_mut()

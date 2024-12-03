@@ -1,5 +1,4 @@
-use borsh::{to_vec, BorshDeserialize};
-use borsh_derive::{BorshDeserialize, BorshSerialize};
+use borsh::to_vec;
 use openssl::pkey::Private;
 use openssl::rsa::Rsa;
 use openssl::sha::Sha256;
@@ -123,35 +122,6 @@ impl BlockToReturn {
             label,
         }
     }
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
-pub struct GossipsubEvent {
-    pub id: GossipsubEventId,
-    pub message: Vec<u8>,
-}
-
-impl GossipsubEvent {
-    pub fn new(id: GossipsubEventId, message: Vec<u8>) -> Self {
-        Self { id, message }
-    }
-
-    pub fn to_byte_array(&self) -> Vec<u8> {
-        to_vec(self).expect("Failed to serialize event")
-    }
-
-    pub fn from_byte_array(bytes: &[u8]) -> Self {
-        Self::try_from_slice(bytes).expect("Failed to deserialize event")
-    }
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq)]
-pub enum GossipsubEventId {
-    Block,
-    Chain,
-    CommandGetChain,
-    AddSignatoryFromCompany,
-    RemoveSignatoryFromCompany,
 }
 
 pub fn start_blockchain_for_new_bill(

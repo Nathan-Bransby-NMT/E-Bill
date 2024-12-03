@@ -2,8 +2,7 @@ use super::build_validation_response;
 use super::contact_service::IdentityPublicData;
 use super::identity_service::IdentityWithAll;
 use crate::blockchain::{
-    self, start_blockchain_for_new_bill, Block, Chain, ChainToReturn, GossipsubEvent,
-    GossipsubEventId, OperationCode,
+    self, start_blockchain_for_new_bill, Block, Chain, ChainToReturn, OperationCode,
 };
 use crate::constants::COMPOUNDING_INTEREST_RATE_ZERO;
 use crate::persistence::file_upload::FileUploadStoreApi;
@@ -12,7 +11,10 @@ use crate::util::get_current_payee_private_key;
 use crate::web::data::File;
 use crate::CONFIG;
 use crate::{dht, external, persistence, util};
-use crate::{dht::Client, persistence::bill::BillStoreApi};
+use crate::{
+    dht::{Client, GossipsubEvent, GossipsubEventId},
+    persistence::bill::BillStoreApi,
+};
 use async_trait::async_trait;
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 use chrono::Utc;
@@ -678,7 +680,7 @@ impl BillServiceApi for BillService {
     async fn propagate_block(&self, bill_name: &str, block: &Block) -> Result<()> {
         let block_bytes = serde_json::to_vec(block)?;
         let event = GossipsubEvent::new(GossipsubEventId::Block, block_bytes);
-        let message = event.to_byte_array();
+        let message = event.to_byte_array()?;
 
         self.client
             .clone()

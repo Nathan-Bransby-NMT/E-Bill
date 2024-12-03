@@ -6,8 +6,8 @@ use super::behaviour::{
     CompanyKeysRequest, CompanyLogoRequest, CompanyProofRequest, Event, FileResponse,
     ParsedInboundFileRequest,
 };
-use super::Result;
-use crate::blockchain::{Chain, GossipsubEvent, GossipsubEventId};
+use super::{GossipsubEvent, GossipsubEventId, Result};
+use crate::blockchain::Chain;
 use crate::constants::{
     BILLS_PREFIX, BILL_PREFIX, COMPANIES_PREFIX, COMPANY_PREFIX, IDENTITY_PREFIX,
 };
@@ -900,7 +900,7 @@ impl Client {
 
         for bill in bills {
             let event = GossipsubEvent::new(GossipsubEventId::CommandGetChain, vec![0; 24]);
-            let message = event.to_byte_array();
+            let message = event.to_byte_array()?;
 
             self.add_message_to_bill_topic(message, &bill.name).await?;
         }
