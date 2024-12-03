@@ -26,7 +26,7 @@ mod event_loop;
 use crate::persistence::bill::BillStoreApi;
 use crate::persistence::company::CompanyStoreApi;
 use crate::persistence::identity::IdentityStoreApi;
-use crate::{persistence, util};
+use crate::{blockchain, persistence, util};
 pub use client::Client;
 use libp2p::identity::Keypair;
 use log::{error, info};
@@ -102,6 +102,10 @@ pub enum Error {
     /// error if the listen url is invalid
     #[error("invalid listen p2p url error")]
     ListenP2pUrlInvalid,
+
+    /// errors that stem from interacting with a blockchain
+    #[error("Blockchain error: {0}")]
+    Blockchain(#[from] blockchain::Error),
 }
 
 pub struct Dht {

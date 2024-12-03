@@ -6,6 +6,14 @@ use crate::bill::get_path_for_bill;
 use crate::blockchain::OperationCode::{
     Accept, Endorse, Issue, Mint, RequestToAccept, RequestToPay, Sell,
 };
+use crate::constants::ACCEPTED_BY;
+use crate::constants::AMOUNT;
+use crate::constants::ENDORSED_BY;
+use crate::constants::ENDORSED_TO;
+use crate::constants::REQ_TO_ACCEPT_BY;
+use crate::constants::REQ_TO_PAY_BY;
+use crate::constants::SOLD_BY;
+use crate::constants::SOLD_TO;
 use crate::external;
 use crate::service::bill_service::BillKeys;
 use crate::service::bill_service::BitcreditBill;
@@ -236,14 +244,14 @@ impl Chain {
                 let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                 let part_without_sold_to = block_data_decrypted
-                    .split("Sold to ")
+                    .split(SOLD_TO)
                     .collect::<Vec<&str>>()
                     .get(1)
                     .unwrap()
                     .to_string();
 
                 let part_with_buyer = part_without_sold_to
-                    .split(" sold by ")
+                    .split(SOLD_BY)
                     .collect::<Vec<&str>>()
                     .first()
                     .unwrap()
@@ -262,14 +270,14 @@ impl Chain {
                 let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                 let mut part_with_endorsee = block_data_decrypted
-                    .split("Endorsed to ")
+                    .split(ENDORSED_TO)
                     .collect::<Vec<&str>>()
                     .get(1)
                     .unwrap()
                     .to_string();
 
                 part_with_endorsee = part_with_endorsee
-                    .split(" endorsed by ")
+                    .split(ENDORSED_BY)
                     .collect::<Vec<&str>>()
                     .first()
                     .unwrap()
@@ -285,14 +293,14 @@ impl Chain {
                 let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                 let mut part_with_mint = block_data_decrypted
-                    .split("Endorsed to ")
+                    .split(ENDORSED_TO)
                     .collect::<Vec<&str>>()
                     .get(1)
                     .unwrap()
                     .to_string();
 
                 part_with_mint = part_with_mint
-                    .split(" endorsed by ")
+                    .split(ENDORSED_BY)
                     .collect::<Vec<&str>>()
                     .first()
                     .unwrap()
@@ -363,14 +371,14 @@ impl Chain {
             let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
             let part_without_sold_to = block_data_decrypted
-                .split("Sold to ")
+                .split(SOLD_TO)
                 .collect::<Vec<&str>>()
                 .get(1)
                 .unwrap()
                 .to_string();
 
             let part_with_buyer = part_without_sold_to
-                .split(" sold by ")
+                .split(SOLD_BY)
                 .collect::<Vec<&str>>()
                 .first()
                 .unwrap()
@@ -378,7 +386,7 @@ impl Chain {
 
             let part_with_seller_and_amount = part_without_sold_to
                 .clone()
-                .split(" sold by ")
+                .split(SOLD_BY)
                 .collect::<Vec<&str>>()
                 .get(1)
                 .unwrap()
@@ -386,7 +394,7 @@ impl Chain {
 
             let amount: u64 = part_with_seller_and_amount
                 .clone()
-                .split(" amount: ")
+                .split(AMOUNT)
                 .collect::<Vec<&str>>()
                 .get(1)
                 .unwrap()
@@ -396,7 +404,7 @@ impl Chain {
 
             let part_with_seller = part_with_seller_and_amount
                 .clone()
-                .split(" amount: ")
+                .split(AMOUNT)
                 .collect::<Vec<&str>>()
                 .first()
                 .unwrap()
@@ -493,7 +501,7 @@ impl Chain {
             let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
             let part_without_sold_to = block_data_decrypted
-                .split("Sold to ")
+                .split(SOLD_TO)
                 .collect::<Vec<&str>>()
                 .get(1)
                 .unwrap()
@@ -501,7 +509,7 @@ impl Chain {
 
             let part_with_seller_and_amount = part_without_sold_to
                 .clone()
-                .split(" sold by ")
+                .split(SOLD_BY)
                 .collect::<Vec<&str>>()
                 .get(1)
                 .unwrap()
@@ -509,7 +517,7 @@ impl Chain {
 
             let amount: u64 = part_with_seller_and_amount
                 .clone()
-                .split(" amount: ")
+                .split(AMOUNT)
                 .collect::<Vec<&str>>()
                 .get(1)
                 .unwrap()
@@ -559,7 +567,7 @@ impl Chain {
         let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
         let part_without_sold_to = block_data_decrypted
-            .split("Sold to ")
+            .split(SOLD_TO)
             .collect::<Vec<&str>>()
             .get(1)
             .unwrap()
@@ -567,7 +575,7 @@ impl Chain {
 
         let part_with_seller_and_amount = part_without_sold_to
             .clone()
-            .split(" sold by ")
+            .split(SOLD_BY)
             .collect::<Vec<&str>>()
             .get(1)
             .unwrap()
@@ -575,7 +583,7 @@ impl Chain {
 
         let part_with_seller = part_with_seller_and_amount
             .clone()
-            .split(" amount: ")
+            .split(AMOUNT)
             .collect::<Vec<&str>>()
             .first()
             .unwrap()
@@ -683,19 +691,19 @@ impl Chain {
     /// `Vec<String>`:  
     /// - A vector containing the unique identifiers of nodes associated with the bill.
     ///
-    pub fn get_all_nodes_from_bill(&self) -> Vec<String> {
+    pub fn get_all_nodes_from_bill(&self, bill_keys: &BillKeys) -> Result<Vec<String>> {
         let mut nodes: Vec<String> = Vec::new();
 
         for block in &self.blocks {
             let bill = self.get_first_version_bill();
-            let nodes_in_block = block.get_nodes_from_block(bill);
+            let nodes_in_block = block.get_nodes_from_block(bill, bill_keys)?;
             for node in nodes_in_block {
                 if !node.is_empty() && !nodes.contains(&node) {
                     nodes.push(node);
                 }
             }
         }
-        nodes
+        Ok(nodes)
     }
 
     /// This function determines the drawer of the bill by evaluating the following conditions:
@@ -757,7 +765,7 @@ impl Chain {
                     let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                     let mut part_with_endorsee = block_data_decrypted
-                        .split("Endorsed to ")
+                        .split(ENDORSED_TO)
                         .collect::<Vec<&str>>()
                         .get(1)
                         .unwrap()
@@ -765,14 +773,14 @@ impl Chain {
 
                     let part_with_endorsed_by = part_with_endorsee
                         .clone()
-                        .split(" endorsed by ")
+                        .split(ENDORSED_BY)
                         .collect::<Vec<&str>>()
                         .get(1)
                         .unwrap()
                         .to_string();
 
                     part_with_endorsee = part_with_endorsee
-                        .split(" endorsed by ")
+                        .split(ENDORSED_BY)
                         .collect::<Vec<&str>>()
                         .first()
                         .unwrap()
@@ -803,7 +811,7 @@ impl Chain {
                     let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                     let mut part_with_mint = block_data_decrypted
-                        .split("Endorsed to ")
+                        .split(ENDORSED_TO)
                         .collect::<Vec<&str>>()
                         .get(1)
                         .unwrap()
@@ -811,14 +819,14 @@ impl Chain {
 
                     let part_with_minter = part_with_mint
                         .clone()
-                        .split(" endorsed by ")
+                        .split(ENDORSED_BY)
                         .collect::<Vec<&str>>()
                         .get(1)
                         .unwrap()
                         .to_string();
 
                     part_with_mint = part_with_mint
-                        .split(" endorsed by ")
+                        .split(ENDORSED_BY)
                         .collect::<Vec<&str>>()
                         .first()
                         .unwrap()
@@ -849,7 +857,7 @@ impl Chain {
                     let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                     let part_with_identity = block_data_decrypted
-                        .split("Requested to accept by ")
+                        .split(REQ_TO_ACCEPT_BY)
                         .collect::<Vec<&str>>()
                         .get(1)
                         .unwrap()
@@ -873,7 +881,7 @@ impl Chain {
                     let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                     let part_with_identity = block_data_decrypted
-                        .split("Accepted by ")
+                        .split(ACCEPTED_BY)
                         .collect::<Vec<&str>>()
                         .get(1)
                         .unwrap()
@@ -897,7 +905,7 @@ impl Chain {
                     let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                     let part_with_identity = block_data_decrypted
-                        .split("Requested to pay by ")
+                        .split(REQ_TO_PAY_BY)
                         .collect::<Vec<&str>>()
                         .get(1)
                         .unwrap()
@@ -921,14 +929,14 @@ impl Chain {
                     let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                     let part_without_sold_to = block_data_decrypted
-                        .split("Sold to ")
+                        .split(SOLD_TO)
                         .collect::<Vec<&str>>()
                         .get(1)
                         .unwrap()
                         .to_string();
 
                     let part_with_buyer = part_without_sold_to
-                        .split(" sold by ")
+                        .split(SOLD_BY)
                         .collect::<Vec<&str>>()
                         .first()
                         .unwrap()
@@ -936,7 +944,7 @@ impl Chain {
 
                     let part_with_seller_and_amount = part_without_sold_to
                         .clone()
-                        .split(" sold by ")
+                        .split(SOLD_BY)
                         .collect::<Vec<&str>>()
                         .get(1)
                         .unwrap()
@@ -944,7 +952,7 @@ impl Chain {
 
                     let part_with_seller = part_with_seller_and_amount
                         .clone()
-                        .split(" amount: ")
+                        .split(AMOUNT)
                         .collect::<Vec<&str>>()
                         .first()
                         .unwrap()
@@ -1006,7 +1014,7 @@ fn is_block_valid(block: &Block, previous_block: &Block) -> bool {
     {
         warn!("block with id: {} has invalid hash", block.id);
         return false;
-    } else if !block.verifier() {
+    } else if !block.verify() {
         warn!("block with id: {} has invalid signature", block.id);
         return false;
     }

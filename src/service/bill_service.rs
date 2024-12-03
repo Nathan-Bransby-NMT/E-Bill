@@ -4,7 +4,10 @@ use super::identity_service::IdentityWithAll;
 use crate::blockchain::{
     self, start_blockchain_for_new_bill, Block, Chain, ChainToReturn, OperationCode,
 };
-use crate::constants::COMPOUNDING_INTEREST_RATE_ZERO;
+use crate::constants::{
+    ACCEPTED_BY, AMOUNT, COMPOUNDING_INTEREST_RATE_ZERO, ENDORSED_BY, ENDORSED_TO,
+    REQ_TO_ACCEPT_BY, REQ_TO_PAY_BY, SOLD_BY, SOLD_TO,
+};
 use crate::persistence::file_upload::FileUploadStoreApi;
 use crate::persistence::identity::IdentityStoreApi;
 use crate::util::get_current_payee_private_key;
@@ -320,7 +323,7 @@ impl BillServiceApi for BillService {
             let chain = self.store.read_bill_chain_from_file(&bill.name).await?;
             let bill_keys = self.store.read_bill_keys_from_file(&bill.name).await?;
             let drawer = chain.get_drawer(&bill_keys);
-            let chain_to_return = ChainToReturn::new(chain.clone(), &bill_keys);
+            let chain_to_return = ChainToReturn::new(chain.clone(), &bill_keys)?;
             let endorsed = chain.exist_block_with_operation_code(OperationCode::Endorse);
             let accepted = chain.exist_block_with_operation_code(OperationCode::Accept);
             let requested_to_pay =
@@ -388,7 +391,7 @@ impl BillServiceApi for BillService {
 
         let drawer = chain.get_drawer(&bill_keys);
         let mut link_for_buy = "".to_string();
-        let chain_to_return = ChainToReturn::new(chain.clone(), &bill_keys);
+        let chain_to_return = ChainToReturn::new(chain.clone(), &bill_keys)?;
         let endorsed = chain.exist_block_with_operation_code(OperationCode::Endorse);
         let accepted = chain.exist_block_with_operation_code(OperationCode::Accept);
         let mut address_for_selling: String = String::new();
@@ -736,8 +739,7 @@ impl BillServiceApi for BillService {
         }
 
         let identity = self.identity_store.get_full().await?;
-        let data_for_new_block =
-            self.get_data_for_new_block(&identity, "Accepted by ", None, "")?;
+        let data_for_new_block = self.get_data_for_new_block(&identity, ACCEPTED_BY, None, "")?;
         self.add_block_for_operation(
             bill_name,
             &mut blockchain,
@@ -761,7 +763,7 @@ impl BillServiceApi for BillService {
         {
             let identity = self.identity_store.get_full().await?;
             let data_for_new_block =
-                self.get_data_for_new_block(&identity, "Requested to pay by ", None, "")?;
+                self.get_data_for_new_block(&identity, REQ_TO_PAY_BY, None, "")?;
             self.add_block_for_operation(
                 bill_name,
                 &mut blockchain,
@@ -787,7 +789,7 @@ impl BillServiceApi for BillService {
         {
             let identity = self.identity_store.get_full().await?;
             let data_for_new_block =
-                self.get_data_for_new_block(&identity, "Requested to accept by ", None, "")?;
+                self.get_data_for_new_block(&identity, REQ_TO_ACCEPT_BY, None, "")?;
             self.add_block_for_operation(
                 bill_name,
                 &mut blockchain,
@@ -819,8 +821,8 @@ impl BillServiceApi for BillService {
             let identity = self.identity_store.get_full().await?;
             let data_for_new_block = self.get_data_for_new_block(
                 &identity,
-                "Endorsed to ",
-                Some((&mintnode, " endorsed by ")),
+                ENDORSED_TO,
+                Some((&mintnode, ENDORSED_BY)),
                 "",
             )?;
             self.add_block_for_operation(
@@ -855,9 +857,9 @@ impl BillServiceApi for BillService {
             let identity = self.identity_store.get_full().await?;
             let data_for_new_block = self.get_data_for_new_block(
                 &identity,
-                "Sold to ",
-                Some((&buyer, " sold by ")),
-                &format!(" amount: {amount_numbers}"),
+                SOLD_TO,
+                Some((&buyer, SOLD_BY)),
+                &format!("{}{amount_numbers}", AMOUNT),
             )?;
             self.add_block_for_operation(
                 bill_name,
@@ -890,8 +892,8 @@ impl BillServiceApi for BillService {
             let identity = self.identity_store.get_full().await?;
             let data_for_new_block = self.get_data_for_new_block(
                 &identity,
-                "Endorsed to ",
-                Some((&endorsee, " endorsed by ")),
+                ENDORSED_TO,
+                Some((&endorsee, ENDORSED_BY)),
                 "",
             )?;
             self.add_block_for_operation(

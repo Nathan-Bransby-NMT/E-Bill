@@ -34,3 +34,13 @@ pub const RELAY_BOOTSTRAP_NODE_ONE_IP: Ipv4Addr = Ipv4Addr::new(45, 147, 248, 87
 pub const RELAY_BOOTSTRAP_NODE_ONE_TCP: u16 = 1908;
 pub const RELAY_BOOTSTRAP_NODE_ONE_PEER_ID: &str =
     "12D3KooWFvRxAazxdKVB7SsTtcLTnvmF8brtW2kQRhceohtgcJv2";
+
+// Bill Data constants
+pub const ENDORSED_TO: &str = "Endorsed to ";
+pub const ENDORSED_BY: &str = " endorsed by ";
+pub const REQ_TO_ACCEPT_BY: &str = "Requested to accept by ";
+pub const REQ_TO_PAY_BY: &str = "Requested to pay by ";
+pub const ACCEPTED_BY: &str = "Accepted by ";
+pub const SOLD_TO: &str = "Sold to ";
+pub const SOLD_BY: &str = " sold by ";
+pub const AMOUNT: &str = " amount: ";

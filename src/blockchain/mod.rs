@@ -13,6 +13,7 @@ use crate::service::contact_service::IdentityPublicData;
 use crate::util::rsa::encrypt_bytes;
 pub use block::Block;
 pub use chain::Chain;
+use std::string::FromUtf8Error;
 
 mod block;
 mod chain;
@@ -38,6 +39,19 @@ pub enum Error {
     /// Errors stemming from cryptography, such as converting keys
     #[error("Cryptography error: {0}")]
     Cryptography(#[from] openssl::error::ErrorStack),
+
+    /// Errors stemming from decoding
+    #[error("Decode error: {0}")]
+    Decode(#[from] hex::FromHexError),
+
+    /// Errors stemming from converting from utf-8 strings
+    #[error("UTF-8 error: {0}")]
+    Utf8(#[from] FromUtf8Error),
+
+    /// Errors stemming from dealing with invalid block data, e.g. if within an Endorse block,
+    /// there is no endorsee
+    #[error("Invalid block data error: {0}")]
+    InvalidBlockdata(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -56,13 +70,13 @@ impl ChainToReturn {
     /// # Returns
     /// A new instance containing the transformed `BlockToReturn` objects.
     ///
-    pub fn new(chain: Chain, bill_keys: &BillKeys) -> Self {
+    pub fn new(chain: Chain, bill_keys: &BillKeys) -> Result<Self> {
         let mut blocks: Vec<BlockToReturn> = Vec::new();
         let bill = chain.get_first_version_bill_with_keys(bill_keys);
         for block in chain.blocks {
-            blocks.push(BlockToReturn::new(block, bill.clone()));
+            blocks.push(BlockToReturn::new(block, bill.clone(), bill_keys)?);
         }
-        Self { blocks }
+        Ok(Self { blocks })
     }
 }
 
@@ -106,10 +120,10 @@ pub struct BlockToReturn {
 }
 
 impl BlockToReturn {
-    pub fn new(block: Block, bill: BitcreditBill) -> Self {
-        let label = block.get_history_label(bill);
+    pub fn new(block: Block, bill: BitcreditBill, bill_keys: &BillKeys) -> Result<Self> {
+        let label = block.get_history_label(bill, bill_keys)?;
 
-        Self {
+        Ok(Self {
             id: block.id,
             bill_name: block.bill_name,
             hash: block.hash,
@@ -120,7 +134,7 @@ impl BlockToReturn {
             public_key: block.public_key,
             operation_code: block.operation_code,
             label,
-        }
+        })
     }
 }
 

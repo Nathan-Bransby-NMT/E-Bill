@@ -875,8 +875,9 @@ impl Client {
         let bills = self.bill_store.get_bills().await?;
 
         for bill in bills {
+            let bill_keys = self.bill_store.read_bill_keys_from_file(&bill.name).await?;
             let chain = Chain::read_chain_from_file(&bill.name);
-            let nodes = chain.get_all_nodes_from_bill();
+            let nodes = chain.get_all_nodes_from_bill(&bill_keys)?;
             for node in nodes {
                 self.add_bill_to_dht_for_node(&bill.name, &node).await?;
             }
