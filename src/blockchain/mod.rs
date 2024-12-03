@@ -154,7 +154,8 @@ pub fn start_blockchain_for_new_bill(
     _private_key: String,
     _private_key_pem: String,
     _timestamp: i64,
-) {
+) -> Result<()> {
+    Ok(())
 }
 #[cfg(not(test))]
 pub fn start_blockchain_for_new_bill(
@@ -165,15 +166,15 @@ pub fn start_blockchain_for_new_bill(
     private_key: String,
     private_key_pem: String,
     timestamp: i64,
-) {
+) -> Result<()> {
     use crate::bill::get_path_for_bill;
 
-    let data_for_new_block_in_bytes = serde_json::to_vec(&drawer).unwrap();
+    let data_for_new_block_in_bytes = serde_json::to_vec(&drawer)?;
     let data_for_new_block = "Signed by ".to_string() + &hex::encode(data_for_new_block_in_bytes);
 
     let genesis_hash: String = hex::encode(data_for_new_block.as_bytes());
 
-    let bill_data: String = encrypted_hash_data_from_bill(bill, private_key_pem);
+    let bill_data: String = encrypted_hash_data_from_bill(bill, private_key_pem)?;
 
     let first_block = Block::new(
         1,
@@ -188,7 +189,8 @@ pub fn start_blockchain_for_new_bill(
 
     let chain = Chain::new(first_block);
     let output_path = get_path_for_bill(&bill.name);
-    std::fs::write(output_path, serde_json::to_string_pretty(&chain).unwrap()).unwrap();
+    std::fs::write(output_path, serde_json::to_string_pretty(&chain)?)?;
+    Ok(())
 }
 
 fn calculate_hash(
@@ -215,10 +217,10 @@ fn calculate_hash(
 }
 
 #[cfg_attr(test, allow(dead_code))]
-fn encrypted_hash_data_from_bill(bill: &BitcreditBill, private_key_pem: String) -> String {
-    let bytes = to_vec(bill).unwrap();
-    let key: Rsa<Private> = Rsa::private_key_from_pem(private_key_pem.as_bytes()).unwrap();
+fn encrypted_hash_data_from_bill(bill: &BitcreditBill, private_key_pem: String) -> Result<String> {
+    let bytes = to_vec(bill)?;
+    let key: Rsa<Private> = Rsa::private_key_from_pem(private_key_pem.as_bytes())?;
     let encrypted_bytes = encrypt_bytes(&bytes, &key);
 
-    hex::encode(encrypted_bytes)
+    Ok(hex::encode(encrypted_bytes))
 }
