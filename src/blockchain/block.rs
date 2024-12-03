@@ -1,4 +1,5 @@
 use super::OperationCode;
+use super::Result;
 use crate::blockchain::calculate_hash;
 use crate::blockchain::OperationCode::{
     Accept, Endorse, Issue, Mint, RequestToAccept, RequestToPay, Sell,
@@ -50,7 +51,6 @@ impl Block {
     /// A new instance of the struct populated with the provided data, a calculated block hash,
     /// and a signature.
     ///
-
     pub fn new(
         id: u64,
         previous_hash: String,
@@ -60,7 +60,7 @@ impl Block {
         operation_code: OperationCode,
         private_key: String,
         timestamp: i64,
-    ) -> Self {
+    ) -> Result<Self> {
         let hash: String = mine_block(
             &id,
             &bill_name,
@@ -70,9 +70,9 @@ impl Block {
             &public_key,
             &operation_code,
         );
-        let signature = signature(hash.clone(), private_key.clone());
+        let signature = signature(&hash, &private_key)?;
 
-        Self {
+        Ok(Self {
             id,
             bill_name,
             hash,
@@ -82,7 +82,7 @@ impl Block {
             data,
             public_key,
             operation_code,
-        }
+        })
     }
     /// Extracts the list of unique peer IDs (nodes) involved in a block operation.
     ///
@@ -583,7 +583,6 @@ impl Block {
 ///
 /// A `String` containing the hexadecimal representation of the calculated block hash.
 ///
-
 fn mine_block(
     id: &u64,
     bill_name: &str,
@@ -621,17 +620,17 @@ fn mine_block(
 ///
 /// A `String` containing the hexadecimal representation of the digital signature.
 ///
-fn signature(hash: String, private_key_pem: String) -> String {
-    let private_key_rsa = Rsa::private_key_from_pem(private_key_pem.as_bytes()).unwrap();
-    let signer_key = PKey::from_rsa(private_key_rsa).unwrap();
+fn signature(hash: &str, private_key_pem: &str) -> Result<String> {
+    let private_key_rsa = Rsa::private_key_from_pem(private_key_pem.as_bytes())?;
+    let signer_key = PKey::from_rsa(private_key_rsa)?;
 
-    let mut signer: Signer = Signer::new(MessageDigest::sha256(), signer_key.as_ref()).unwrap();
+    let mut signer: Signer = Signer::new(MessageDigest::sha256(), signer_key.as_ref())?;
 
     let data_to_sign = hash.as_bytes();
-    signer.update(data_to_sign).unwrap();
+    signer.update(data_to_sign)?;
 
-    let signature: Vec<u8> = signer.sign_to_vec().unwrap();
+    let signature: Vec<u8> = signer.sign_to_vec()?;
     let signature_readable = hex::encode(signature.as_slice());
 
-    signature_readable
+    Ok(signature_readable)
 }

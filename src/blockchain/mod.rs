@@ -47,15 +47,15 @@ pub struct ChainToReturn {
 }
 
 impl ChainToReturn {
-    /// Creates a new instance of the `Self` type by transforming a given `Chain` into its corresponding representation.
+    /// Creates a new Chain to return by transforming a given `Chain` into its corresponding representation.
     ///
     /// # Parameters
-    /// * `chain` - The `Chain` object to be transformed. It contains the list of blocks and the initial bill version
+    /// * `chain` - The `Chain` to be transformed. It contains the list of blocks and the initial bill version
     ///   necessary for processing.
     /// * `bill_keys` - The keys for the bill
     ///
     /// # Returns
-    /// A new instance of `Self`, with a `blocks` field containing the transformed `BlockToReturn` objects.
+    /// A new instance containing the transformed `BlockToReturn` objects.
     ///
     pub fn new(chain: Chain, bill_keys: &BillKeys) -> Self {
         let mut blocks: Vec<BlockToReturn> = Vec::new();
@@ -158,9 +158,9 @@ pub fn start_blockchain_for_new_bill(
     bill: &BitcreditBill,
     operation_code: OperationCode,
     drawer: IdentityPublicData,
-    public_key: String,
-    private_key: String,
-    private_key_pem: String,
+    drawer_public_key: String,
+    drawer_private_key: String,
+    bill_private_key_pem: String,
     timestamp: i64,
 ) -> Result<Chain> {
     let data_for_new_block_in_bytes = serde_json::to_vec(&drawer)?;
@@ -168,18 +168,18 @@ pub fn start_blockchain_for_new_bill(
 
     let genesis_hash: String = hex::encode(data_for_new_block.as_bytes());
 
-    let bill_data: String = encrypted_hash_data_from_bill(bill, private_key_pem)?;
+    let encrypted_bill_data: String = encrypted_hash_data_from_bill(bill, &bill_private_key_pem)?;
 
     let first_block = Block::new(
         1,
         genesis_hash,
-        bill_data,
+        encrypted_bill_data,
         bill.name.clone(),
-        public_key,
+        drawer_public_key,
         operation_code,
-        private_key,
+        drawer_private_key,
         timestamp,
-    );
+    )?;
 
     let chain = Chain::new(first_block);
     Ok(chain)
@@ -208,7 +208,7 @@ fn calculate_hash(
     hasher.finish().to_vec()
 }
 
-fn encrypted_hash_data_from_bill(bill: &BitcreditBill, private_key_pem: String) -> Result<String> {
+fn encrypted_hash_data_from_bill(bill: &BitcreditBill, private_key_pem: &str) -> Result<String> {
     let bytes = to_vec(bill)?;
     let key: Rsa<Private> = Rsa::private_key_from_pem(private_key_pem.as_bytes())?;
     let encrypted_bytes = encrypt_bytes(&bytes, &key);

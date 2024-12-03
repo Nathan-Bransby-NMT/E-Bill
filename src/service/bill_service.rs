@@ -294,7 +294,7 @@ impl BillService {
             operation_code,
             identity.identity.private_key_pem,
             timestamp,
-        );
+        )?;
 
         let try_add_block = blockchain.try_add_block(new_block);
         if try_add_block && blockchain.is_chain_valid() {
@@ -1096,16 +1096,19 @@ mod test {
         let key = Rsa::private_key_from_pem(TEST_PRIVATE_KEY.as_bytes()).unwrap();
         let encrypted = util::rsa::encrypt_bytes(&data, &key);
         let encoded = hex::encode(encrypted);
-        Chain::new(Block::new(
-            123456,
-            "prevhash".to_string(),
-            encoded,
-            bill_name.to_string(),
-            TEST_PUB_KEY.to_owned(),
-            OperationCode::Issue,
-            TEST_PRIVATE_KEY.to_owned(),
-            1731593928,
-        ))
+        Chain::new(
+            Block::new(
+                123456,
+                "prevhash".to_string(),
+                encoded,
+                bill_name.to_string(),
+                TEST_PUB_KEY.to_owned(),
+                OperationCode::Issue,
+                TEST_PRIVATE_KEY.to_owned(),
+                1731593928,
+            )
+            .unwrap(),
+        )
     }
 
     fn get_service(mock_storage: MockBillStoreApi) -> BillService {
@@ -1599,16 +1602,19 @@ mod test {
             })
         });
         let mut chain = get_genesis_chain("some name", Some(bill.clone()));
-        chain.blocks.push(Block::new(
-            123456,
-            "prevhash".to_string(),
-            "hash".to_string(),
-            "some name".to_string(),
-            TEST_PUB_KEY.to_owned(),
-            OperationCode::Accept,
-            TEST_PRIVATE_KEY.to_owned(),
-            1731593928,
-        ));
+        chain.blocks.push(
+            Block::new(
+                123456,
+                "prevhash".to_string(),
+                "hash".to_string(),
+                "some name".to_string(),
+                TEST_PUB_KEY.to_owned(),
+                OperationCode::Accept,
+                TEST_PRIVATE_KEY.to_owned(),
+                1731593928,
+            )
+            .unwrap(),
+        );
         storage
             .expect_read_bill_chain_from_file()
             .returning(move |_| Ok(chain.clone()));

@@ -37,7 +37,6 @@ pub struct BlockForHistory {
 }
 
 impl Chain {
-    #[cfg_attr(test, allow(dead_code))]
     pub fn new(first_block: Block) -> Self {
         let blocks = vec![first_block];
 
