@@ -25,7 +25,9 @@ pub fn bill_from_byte_array(bill: &[u8]) -> Result<BitcreditBill, borsh::maybest
 
 pub fn read_keys_from_bill_file(bill_name: &str) -> Result<BillKeys, std::io::Error> {
     let input_path = get_path_for_bill_keys(bill_name);
-    let blockchain_from_file = fs::read(input_path)?;
-    let bill_keys: BillKeys = serde_json::from_slice(blockchain_from_file.as_slice())?;
+    let blockchain_from_file = fs::read(&input_path)
+        .map_err(|e| std::io::Error::new(e.kind(), format!("Failed to read file at {}: {}", input_path.display(), e)))?;
+    let bill_keys: BillKeys = serde_json::from_slice(blockchain_from_file.as_slice())
+        .map_err(|e| std::io::Error::new(e.kind(), format!("Failed to deserialize BillKeys from file at {}: {}", input_path.display(), e)))?;
     Ok(bill_keys)
 }
