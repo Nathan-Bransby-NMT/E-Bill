@@ -194,14 +194,14 @@ impl Chain {
     /// A `BitcreditBill` object containing the most recent version of the bill, including the payee, endorsee,
     /// and other associated information.
     ///
-    pub async fn get_last_version_bill(&self, bill_keys: &BillKeys) -> Result<BitcreditBill> {
+    pub async fn get_last_version_bill(&self, bill_keys: &BillKeys) -> BitcreditBill {
         let first_block = self.get_first_block();
 
         let key: Rsa<Private> =
-            Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes())?;
-        let bytes = hex::decode(first_block.data.clone())?;
+            Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
+        let bytes = hex::decode(first_block.data.clone()).unwrap();
         let decrypted_bytes = decrypt_bytes(&bytes, &key);
-        let bill_first_version: BitcreditBill = bill_from_byte_array(&decrypted_bytes)?;
+        let bill_first_version: BitcreditBill = bill_from_byte_array(&decrypted_bytes);
 
         let mut last_endorsee = IdentityPublicData {
             peer_id: "".to_string(),
@@ -226,81 +226,81 @@ impl Chain {
             let last_version_block_sell = self.get_last_version_block_with_operation_code(Sell);
             let last_block = self.get_latest_block();
 
-            let paid = Self::check_if_last_sell_block_is_paid(self).await?;
+            let paid = Self::check_if_last_sell_block_is_paid(self).await;
 
             if (last_version_block_endorse.id < last_version_block_sell.id)
                 && (last_version_block_mint.id < last_version_block_sell.id)
                 && ((last_block.id > last_version_block_sell.id) || paid)
             {
-                let bytes = hex::decode(last_version_block_sell.data.clone())?;
+                let bytes = hex::decode(last_version_block_sell.data.clone()).unwrap();
                 let decrypted_bytes = decrypt_bytes(&bytes, &key);
-                let block_data_decrypted = String::from_utf8(decrypted_bytes)?;
+                let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                 let part_without_sold_to = block_data_decrypted
                     .split("Sold to ")
                     .collect::<Vec<&str>>()
                     .get(1)
-                    .ok_or("Failed to parse sold to part")?
+                    .unwrap()
                     .to_string();
 
                 let part_with_buyer = part_without_sold_to
                     .split(" sold by ")
                     .collect::<Vec<&str>>()
                     .first()
-                    .ok_or("Failed to parse buyer part")?
+                    .unwrap()
                     .to_string();
 
-                let buyer_bill_u8 = hex::decode(part_with_buyer)?;
+                let buyer_bill_u8 = hex::decode(part_with_buyer).unwrap();
                 let buyer_bill: IdentityPublicData =
-                    serde_json::from_slice(&buyer_bill_u8)?;
+                    serde_json::from_slice(&buyer_bill_u8).unwrap();
 
                 last_endorsee = buyer_bill.clone();
             } else if self.exist_block_with_operation_code(Endorse.clone())
                 && (last_version_block_endorse.id > last_version_block_mint.id)
             {
-                let bytes = hex::decode(last_version_block_endorse.data.clone())?;
+                let bytes = hex::decode(last_version_block_endorse.data.clone()).unwrap();
                 let decrypted_bytes = decrypt_bytes(&bytes, &key);
-                let block_data_decrypted = String::from_utf8(decrypted_bytes)?;
+                let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                 let mut part_with_endorsee = block_data_decrypted
                     .split("Endorsed to ")
                     .collect::<Vec<&str>>()
                     .get(1)
-                    .ok_or("Failed to parse endorsee part")?
+                    .unwrap()
                     .to_string();
 
                 part_with_endorsee = part_with_endorsee
                     .split(" endorsed by ")
                     .collect::<Vec<&str>>()
                     .first()
-                    .ok_or("Failed to parse endorsee part")?
+                    .unwrap()
                     .to_string();
 
-                let endorsee = hex::decode(part_with_endorsee)?;
-                last_endorsee = serde_json::from_slice(&endorsee)?;
+                let endorsee = hex::decode(part_with_endorsee).unwrap();
+                last_endorsee = serde_json::from_slice(&endorsee).unwrap();
             } else if self.exist_block_with_operation_code(Mint.clone())
                 && (last_version_block_mint.id > last_version_block_endorse.id)
             {
-                let bytes = hex::decode(last_version_block_mint.data.clone())?;
+                let bytes = hex::decode(last_version_block_mint.data.clone()).unwrap();
                 let decrypted_bytes = decrypt_bytes(&bytes, &key);
-                let block_data_decrypted = String::from_utf8(decrypted_bytes)?;
+                let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
                 let mut part_with_mint = block_data_decrypted
                     .split("Endorsed to ")
                     .collect::<Vec<&str>>()
                     .get(1)
-                    .ok_or("Failed to parse mint part")?
+                    .unwrap()
                     .to_string();
 
                 part_with_mint = part_with_mint
                     .split(" endorsed by ")
                     .collect::<Vec<&str>>()
                     .first()
-                    .ok_or("Failed to parse mint part")?
+                    .unwrap()
                     .to_string();
 
-                let mint = hex::decode(part_with_mint)?;
-                last_endorsee = serde_json::from_slice(&mint)?;
+                let mint = hex::decode(part_with_mint).unwrap();
+                last_endorsee = serde_json::from_slice(&mint).unwrap();
             }
         }
 
@@ -310,7 +310,7 @@ impl Chain {
             payee = last_endorsee.clone();
         }
 
-        Ok(BitcreditBill {
+        BitcreditBill {
             name: bill_first_version.name,
             to_payee: bill_first_version.to_payee,
             bill_jurisdiction: bill_first_version.bill_jurisdiction,
@@ -332,7 +332,7 @@ impl Chain {
             private_key: bill_first_version.private_key,
             language: bill_first_version.language,
             files: bill_first_version.files,
-        })
+        }
     }
 
     /// Checks if the payment for the latest sell block has been made, and returns relevant information about the buyer, seller, and the payment status.
@@ -347,7 +347,7 @@ impl Chain {
     ///
     pub async fn waiting_for_payment(
         &self,
-    ) -> Result<(bool, IdentityPublicData, IdentityPublicData, String, u64)> {
+    ) -> (bool, IdentityPublicData, IdentityPublicData, String, u64) {
         let last_block = self.get_latest_block();
         let last_version_block_sell = self.get_last_version_block_with_operation_code(Sell);
         let identity_buyer = IdentityPublicData::new_empty();
@@ -356,25 +356,25 @@ impl Chain {
         if self.exist_block_with_operation_code(Sell.clone())
             && last_block.id == last_version_block_sell.id
         {
-            let bill_keys = read_keys_from_bill_file(&last_version_block_sell.bill_name)?;
+            let bill_keys = read_keys_from_bill_file(&last_version_block_sell.bill_name);
             let key: Rsa<Private> =
-                Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes())?;
-            let bytes = hex::decode(last_version_block_sell.data.clone())?;
+                Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
+            let bytes = hex::decode(last_version_block_sell.data.clone()).unwrap();
             let decrypted_bytes = decrypt_bytes(&bytes, &key);
-            let block_data_decrypted = String::from_utf8(decrypted_bytes)?;
+            let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
             let part_without_sold_to = block_data_decrypted
                 .split("Sold to ")
                 .collect::<Vec<&str>>()
                 .get(1)
-                .ok_or("Failed to parse sold to part")?
+                .unwrap()
                 .to_string();
 
             let part_with_buyer = part_without_sold_to
                 .split(" sold by ")
                 .collect::<Vec<&str>>()
                 .first()
-                .ok_or("Failed to parse buyer part")?
+                .unwrap()
                 .to_string();
 
             let part_with_seller_and_amount = part_without_sold_to
@@ -382,7 +382,7 @@ impl Chain {
                 .split(" sold by ")
                 .collect::<Vec<&str>>()
                 .get(1)
-                .ok_or("Failed to parse seller and amount part")?
+                .unwrap()
                 .to_string();
 
             let amount: u64 = part_with_seller_and_amount
@@ -390,27 +390,28 @@ impl Chain {
                 .split(" amount: ")
                 .collect::<Vec<&str>>()
                 .get(1)
-                .ok_or("Failed to parse amount part")?
+                .unwrap()
                 .to_string()
-                .parse()?;
+                .parse()
+                .unwrap();
 
             let part_with_seller = part_with_seller_and_amount
                 .clone()
                 .split(" amount: ")
                 .collect::<Vec<&str>>()
                 .first()
-                .ok_or("Failed to parse seller part")?
+                .unwrap()
                 .to_string();
 
-            let buyer_bill_u8 = hex::decode(part_with_buyer)?;
-            let buyer_bill: IdentityPublicData = serde_json::from_slice(&buyer_bill_u8)?;
+            let buyer_bill_u8 = hex::decode(part_with_buyer).unwrap();
+            let buyer_bill: IdentityPublicData = serde_json::from_slice(&buyer_bill_u8).unwrap();
             let identity_buyer = buyer_bill;
 
-            let seller_bill_u8 = hex::decode(part_with_seller)?;
-            let seller_bill: IdentityPublicData = serde_json::from_slice(&seller_bill_u8)?;
+            let seller_bill_u8 = hex::decode(part_with_seller).unwrap();
+            let seller_bill: IdentityPublicData = serde_json::from_slice(&seller_bill_u8).unwrap();
             let identity_seller = seller_bill;
 
-            let bill = self.get_first_version_bill()?;
+            let bill = self.get_first_version_bill();
 
             let address_to_pay =
                 Self::get_address_to_pay_for_block_sell(last_version_block_sell.clone(), bill);
@@ -420,34 +421,34 @@ impl Chain {
             let (paid, _amount) =
                 external::bitcoin::check_if_paid(address_to_pay_for_async, amount).await;
 
-            Ok((
+            (
                 !paid,
                 identity_buyer,
                 identity_seller,
                 address_to_pay,
                 amount,
-            ))
+            )
         } else {
-            Ok((false, identity_buyer, identity_seller, String::new(), 0))
+            (false, identity_buyer, identity_seller, String::new(), 0)
         }
     }
 
     /// This asynchronous function checks if the payment deadline associated with the most recent sell block
     /// has passed.
-    # Returns
+    /// # Returns
     ///
     /// - `true` if the payment deadline for the last sell block has passed.
     /// - `false` if no sell block exists or the deadline has not passed.
     ///
-    pub async fn check_if_payment_deadline_has_passed(&self) -> Result<bool> {
+    pub async fn check_if_payment_deadline_has_passed(&self) -> bool {
         if self.exist_block_with_operation_code(Sell) {
             let last_version_block_sell = self.get_last_version_block_with_operation_code(Sell);
 
             let timestamp = last_version_block_sell.timestamp;
 
-            Ok(Self::payment_deadline_has_passed(timestamp, 2).await?)
+            Self::payment_deadline_has_passed(timestamp, 2).await
         } else {
-            Ok(false)
+            false
         }
     }
 
@@ -463,13 +464,14 @@ impl Chain {
     ///
     /// `true` if the payment deadline has passed, otherwise `false`.
     ///
-    async fn payment_deadline_has_passed(timestamp: i64, day: i32) -> Result<bool> {
+    async fn payment_deadline_has_passed(timestamp: i64, day: i32) -> bool {
         let period: i64 = (86400 * day) as i64;
         let current_timestamp = external::time::TimeApi::get_atomic_time()
-            .await?
+            .await
+            .unwrap()
             .timestamp;
         let diference = current_timestamp - timestamp;
-        Ok(diference > period)
+        diference > period
     }
 
     /// This asynchronous function verifies whether the last block that involves a "Sell" operation
@@ -480,22 +482,22 @@ impl Chain {
     ///
     /// `true` if the payment has been made, otherwise `false`. If no "Sell" block exists, it returns `false`.
     ///
-    async fn check_if_last_sell_block_is_paid(&self) -> Result<bool> {
+    async fn check_if_last_sell_block_is_paid(&self) -> bool {
         if self.exist_block_with_operation_code(Sell) {
             let last_version_block_sell = self.get_last_version_block_with_operation_code(Sell);
 
-            let bill_keys = read_keys_from_bill_file(&last_version_block_sell.bill_name)?;
+            let bill_keys = read_keys_from_bill_file(&last_version_block_sell.bill_name);
             let key: Rsa<Private> =
-                Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes())?;
-            let bytes = hex::decode(last_version_block_sell.data.clone())?;
+                Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
+            let bytes = hex::decode(last_version_block_sell.data.clone()).unwrap();
             let decrypted_bytes = decrypt_bytes(&bytes, &key);
-            let block_data_decrypted = String::from_utf8(decrypted_bytes)?;
+            let block_data_decrypted = String::from_utf8(decrypted_bytes).unwrap();
 
             let part_without_sold_to = block_data_decrypted
                 .split("Sold to ")
                 .collect::<Vec<&str>>()
                 .get(1)
-                .ok_or("Failed to parse sold to part")?
+                .unwrap()
                 .to_string();
 
             let part_with_seller_and_amount = part_without_sold_to
@@ -503,7 +505,7 @@ impl Chain {
                 .split(" sold by ")
                 .collect::<Vec<&str>>()
                 .get(1)
-                .ok_or("Failed to parse seller and amount part")?
+                .unwrap()
                 .to_string();
 
             let amount: u64 = part_with_seller_and_amount
@@ -511,20 +513,21 @@ impl Chain {
                 .split(" amount: ")
                 .collect::<Vec<&str>>()
                 .get(1)
-                .ok_or("Failed to parse amount part")?
+                .unwrap()
                 .to_string()
-                .parse()?;
+                .parse()
+                .unwrap();
 
-            let bill = self.get_first_version_bill()?;
+            let bill = self.get_first_version_bill();
 
             let address_to_pay =
                 Self::get_address_to_pay_for_block_sell(last_version_block_sell.clone(), bill);
 
-            Ok(external::bitcoin::check_if_paid(address_to_pay, amount)
+            external::bitcoin::check_if_paid(address_to_pay, amount)
                 .await
-                .0)
+                .0
         } else {
-            Ok(false)
+            false
         }
     }
 
@@ -549,7 +552,7 @@ impl Chain {
     ) -> String {
         let public_key_bill = bitcoin::PublicKey::from_str(&bill.public_key).unwrap();
 
-        let bill_keys = read_keys_from_bill_file(&last_version_block_sell.bill_name).unwrap();
+        let bill_keys = read_keys_from_bill_file(&last_version_block_sell.bill_name);
         let key: Rsa<Private> =
             Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
         let bytes = hex::decode(last_version_block_sell.data.clone()).unwrap();
@@ -605,19 +608,19 @@ impl Chain {
     ///
     /// * `BitcreditBill` - The first version of the bill, decrypted and deserialized from
     ///   the data in the first block.
-    pub fn get_first_version_bill_with_keys(&self, bill_keys: &BillKeys) -> Result<BitcreditBill> {
+    pub fn get_first_version_bill_with_keys(&self, bill_keys: &BillKeys) -> BitcreditBill {
         let first_block_data = &self.get_first_block();
         let key: Rsa<Private> =
-            Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes())?;
-        let bytes = hex::decode(first_block_data.data.clone())?;
+            Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
+        let bytes = hex::decode(first_block_data.data.clone()).unwrap();
         let decrypted_bytes = decrypt_bytes(&bytes, &key);
-        let bill_first_version: BitcreditBill = bill_from_byte_array(&decrypted_bytes)?;
-        Ok(bill_first_version)
+        let bill_first_version: BitcreditBill = bill_from_byte_array(&decrypted_bytes);
+        bill_first_version
     }
 
-    pub fn get_first_version_bill(&self) -> Result<BitcreditBill> {
+    pub fn get_first_version_bill(&self) -> BitcreditBill {
         let first_block_data = &self.get_first_block();
-        let bill_keys = read_keys_from_bill_file(&first_block_data.bill_name)?;
+        let bill_keys = read_keys_from_bill_file(&first_block_data.bill_name);
         self.get_first_version_bill_with_keys(&bill_keys)
     }
 
@@ -685,8 +688,8 @@ impl Chain {
         let mut nodes: Vec<String> = Vec::new();
 
         for block in &self.blocks {
-            let bill = self.get_first_version_bill().unwrap();
-            let nodes_in_block = block.get_nodes_from_block(bill).unwrap();
+            let bill = self.get_first_version_bill();
+            let nodes_in_block = block.get_nodes_from_block(bill);
             for node in nodes_in_block {
                 if !node.is_empty() && !nodes.contains(&node) {
                     nodes.push(node);
@@ -705,9 +708,9 @@ impl Chain {
     /// `IdentityPublicData`:  
     /// - The identity data of the drawer, payee, or drawee depending on the evaluated conditions.
     ///
-    pub fn get_drawer(&self, bill_keys: &BillKeys) -> Result<IdentityPublicData> {
+    pub fn get_drawer(&self, bill_keys: &BillKeys) -> IdentityPublicData {
         let drawer: IdentityPublicData;
-        let bill = self.get_first_version_bill_with_keys(bill_keys)?;
+        let bill = self.get_first_version_bill_with_keys(bill_keys);
         if !bill.drawer.name.is_empty() {
             drawer = bill.drawer.clone();
         } else if bill.to_payee {
@@ -715,7 +718,7 @@ impl Chain {
         } else {
             drawer = bill.drawee.clone();
         }
-        Ok(drawer)
+        drawer
     }
 
     /// This function iterates through all blocks in a bill's blockchain and verifies
@@ -736,7 +739,7 @@ impl Chain {
         for block in &self.blocks {
             match block.operation_code {
                 Issue => {
-                    let bill = self.get_first_version_bill().unwrap();
+                    let bill = self.get_first_version_bill();
                     if bill.drawer.peer_id.eq(request_node_id)
                         || bill.drawee.peer_id.eq(request_node_id)
                         || bill.payee.peer_id.eq(request_node_id)
@@ -747,7 +750,7 @@ impl Chain {
                 Endorse => {
                     let block = self.get_block_by_id(block.id);
 
-                    let bill_keys = read_keys_from_bill_file(&block.bill_name).unwrap();
+                    let bill_keys = read_keys_from_bill_file(&block.bill_name);
                     let key: Rsa<Private> =
                         Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
                     let bytes = hex::decode(block.data.clone()).unwrap();
@@ -793,7 +796,7 @@ impl Chain {
                 Mint => {
                     let block = self.get_block_by_id(block.id);
 
-                    let bill_keys = read_keys_from_bill_file(&block.bill_name).unwrap();
+                    let bill_keys = read_keys_from_bill_file(&block.bill_name);
                     let key: Rsa<Private> =
                         Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
                     let bytes = hex::decode(block.data.clone()).unwrap();
@@ -839,7 +842,7 @@ impl Chain {
                 RequestToAccept => {
                     let block = self.get_block_by_id(block.id);
 
-                    let bill_keys = read_keys_from_bill_file(&block.bill_name).unwrap();
+                    let bill_keys = read_keys_from_bill_file(&block.bill_name);
                     let key: Rsa<Private> =
                         Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
                     let bytes = hex::decode(block.data.clone()).unwrap();
@@ -863,7 +866,7 @@ impl Chain {
                 Accept => {
                     let block = self.get_block_by_id(block.id);
 
-                    let bill_keys = read_keys_from_bill_file(&block.bill_name).unwrap();
+                    let bill_keys = read_keys_from_bill_file(&block.bill_name);
                     let key: Rsa<Private> =
                         Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
                     let bytes = hex::decode(block.data.clone()).unwrap();
@@ -887,7 +890,7 @@ impl Chain {
                 RequestToPay => {
                     let block = self.get_block_by_id(block.id);
 
-                    let bill_keys = read_keys_from_bill_file(&block.bill_name).unwrap();
+                    let bill_keys = read_keys_from_bill_file(&block.bill_name);
                     let key: Rsa<Private> =
                         Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
                     let bytes = hex::decode(block.data.clone()).unwrap();
@@ -911,7 +914,7 @@ impl Chain {
                 Sell => {
                     let block = self.get_block_by_id(block.id);
 
-                    let bill_keys = read_keys_from_bill_file(&block.bill_name).unwrap();
+                    let bill_keys = read_keys_from_bill_file(&block.bill_name);
                     let key: Rsa<Private> =
                         Rsa::private_key_from_pem(bill_keys.private_key_pem.as_bytes()).unwrap();
                     let bytes = hex::decode(block.data.clone()).unwrap();
@@ -1004,7 +1007,7 @@ fn is_block_valid(block: &Block, previous_block: &Block) -> bool {
     {
         warn!("block with id: {} has invalid hash", block.id);
         return false;
-    } else if !block.verifier().unwrap() {
+    } else if !block.verifier() {
         warn!("block with id: {} has invalid signature", block.id);
         return false;
     }
